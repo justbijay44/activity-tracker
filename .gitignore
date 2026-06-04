@@ -1,0 +1,6 @@
+backend/venv/
+backend/productivity.db
+backend/__pycache__/
+backend/*.pyc
+
+extension/node_modules/

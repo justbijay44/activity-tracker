@@ -1,0 +1,11 @@
+{
+    "name": "productivity-tracker",
+    "version": "0.0.1",
+    "manifest_version": 3,
+    "description": "Extension to track how productive you have been",
+    "permissions": ["tabs", "alarms", "storage", "windows"],
+    "background": {
+        "service_worker": "background.js"
+    },
+    "host_permissions": ["http://localhost:8000/*"]
+}
