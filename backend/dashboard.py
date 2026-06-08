@@ -6,12 +6,17 @@ from datetime import date
 st.set_page_config(page_title="Activity Tracker", layout="wide")
 st.title("Activity Tracker")
 
+current = requests.get("http://backend:8000/get-provider").json()["provider"]
+provider = st.selectbox("AI Provider", ["ollama", "groq", "gemini"], index=["ollama", "groq", "gemini"].index(current)) 
+if provider != current:
+    requests.post(f"http://backend:8000/set-provider?provider={provider}")
+
 show_all = st.checkbox("Show all time")
 if not show_all:
     selected_date = st.date_input("Filter by Date", value=date.today())
-    response = requests.get(f"http://localhost:8000/sessions/summary?date={selected_date}")
+    response = requests.get(f"http://backend:8000/sessions/summary?date={selected_date}")
 else:
-    response = requests.get("http://localhost:8000/sessions/summary")
+    response = requests.get("http://backend:8000/sessions/summary")
 
 def convert_time(timeSpent):
     if timeSpent < 60:

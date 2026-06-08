@@ -1,18 +1,38 @@
+import os
 import json
 import requests
 
+AI_PROVIDER = os.getenv("AI_PROVIDER", "ollama").lower()
+
+def set_provider(provider: str):
+    global AI_PROVIDER
+    AI_PROVIDER = provider.lower()
+
+def get_provider():
+    return AI_PROVIDER
+
 def classify_sessions(sessions):
+    prompt = build_prompt(sessions)
+
+    if AI_PROVIDER == "ollama":
+        return call_ollama(prompt)
+    if AI_PROVIDER == "groq":
+        return call_groq(prompt)
+    if AI_PROVIDER == "gemini":
+        return call_gemini(prompt)
+    return call_ollama(prompt)
+
+def build_prompt(sessions):
     prompt = f"""
-        You are a productivity analyzer.
+        You are a JSON API. You must respond with ONLY a JSON array, no other text.
 
         Analyze these browser sessions and classify each one:
         {sessions}
 
-        For each session return a JSON array where each item has:
-        - "title": the tab title
-        - "url": the url
-        - "label": must be exactly one of: "productive", "unproductive", "neutral"
-        - "reason": a short one sentence explanation of why classified it that way
+        Return ONLY this JSON format, nothing else:
+        [
+            {{"title": "...", "url": "...", "label": "productive|unproductive|neutral", "reason": "..."}}
+        ]
 
         Rules:
         - YouTube is UNPRODUCTIVE unless the title contains words like: tutorial, course, how to, learn, study, lecture, explained, guide
@@ -23,22 +43,48 @@ def classify_sessions(sessions):
         - If timeSpent is less than 30 seconds, label NEUTRAL
         - Return ONLY JSON, no extra text, no markdown
     """
+    return prompt
 
-    response = requests.post("http://localhost:11434/api/generate", json={
-        "model": "qwen2.5-coder:7b",
-        "prompt": prompt,
-        "stream": False
-    })
 
-    result = response.json()
-    raw = result["response"].strip()
+def call_ollama(prompt):
+    host = os.getenv("OLLAMA_HOST", "http://host.docker.internal:11434")
+    for attempt in range(3):
+        response = requests.post(f"{host}/api/chat", json={
+            "model": "mistral:7b",
+            "messages": [{"role":"user", "content": prompt}],
+            "stream": False
+        })
+        raw = response.json()["message"]["content"].strip()
+        if raw:
+            break
     raw = raw.replace("```json", "").replace("```", "").strip()
-    parsed = json.loads(raw)
-    return parsed
+    return json.loads(raw)
 
-if __name__ == "__main__":
-    test_sessions = [
-        {"title": "GitHub - fixing auth bug", "url": "https://github.com", "timeSpent": 45.5},
-        {"title": "Instagram", "url": "https://instagram.com", "timeSpent": 120.0}
-    ]
-    classify_sessions(test_sessions)
+def call_groq(prompt):
+    api_key = os.getenv("GROQ_API_KEY")
+    response = requests.post(
+        "https://api.groq.com/openai/v1/chat/completions",
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        },
+        json={
+            "model": "llama-3.3-70b-versatile",
+            "messages": [{"role": "user", "content": prompt}],
+            "temperature": 0
+        }
+    )
+    result = response.json()
+    raw = response.json()["choices"][0]["message"]["content"].strip()
+    raw = raw.replace("```json", "").replace("```", "").strip()
+    return json.loads(raw)
+
+def call_gemini(prompt):
+    api_key = os.getenv("GEMINI_API_KEY")
+    response = requests.post(
+        f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={api_key}",
+        json={"contents": [{"parts": [{"text": prompt}]}]}
+    )
+    raw = response.json()["candidates"][0]["content"]["parts"][0]["text"]
+    raw = raw.replace("```json", "").replace("```", "").strip()
+    return json.loads(raw)

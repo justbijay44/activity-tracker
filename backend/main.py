@@ -1,12 +1,14 @@
+import os
+import requests
 from fastapi import FastAPI
 from pydantic import BaseModel
 from sqlalchemy import func
 from sqlalchemy.orm import sessionmaker
-from urllib.parse import urlparse, urlunparse
+from urllib.parse import urlparse
 
-from datetime import datetime, date, timedelta
-from ai import classify_sessions
+from datetime import datetime, date
 from database import Session as SessionModel, engine
+from ai import classify_sessions, set_provider, get_provider
 
 app = FastAPI()
 SessionLocal = sessionmaker(bind=engine)
@@ -19,7 +21,7 @@ class Session(BaseModel):
 
 def clean_url(url):
     parsed = urlparse(url)
-    return urlunparse(parsed._replace(query="", fragment=""))
+    return parsed.netloc
 
 @app.get("/hello")
 def hello():
@@ -32,9 +34,13 @@ def session_req(sessions: list[Session]):
     for val in sessions:
         cleaned_url = clean_url(val.url)
 
+        if not cleaned_url:
+            continue
+
         existing = db.query(SessionModel).filter(
             SessionModel.url == cleaned_url,
-            SessionModel.label != None
+            SessionModel.label != None,
+            SessionModel.label != "neutral"
         ).first()
 
         record = SessionModel(
@@ -48,35 +54,26 @@ def session_req(sessions: list[Session]):
         db.add(record)
 
         if not existing:
-            to_classify.append(val)
+            to_classify.append({"title": val.title, "url": cleaned_url, "timeSpent": val.timeSpent})
     
     db.commit()
 
     if to_classify:
-        results = classify_sessions([s.model_dump() for s in to_classify])
+        results = []
+        for i in range(0, len(to_classify), 3):
+            batch = to_classify[i:i+5]
+            batch_results = classify_sessions(batch)
+            results.extend(batch_results)
+        
         for ai_result in results:
             record = db.query(SessionModel).filter(
                 SessionModel.url == clean_url(ai_result["url"])
             ).order_by(SessionModel.id.desc()).first()
-            record.label = ai_result["label"]
-            record.reason = ai_result["reason"]
+            if record:
+                record.label = ai_result["label"]
+                record.reason = ai_result["reason"]
         db.commit()
     return {"status": "received"}
-
-@app.get("/sessions")
-def get_sessions(date: date = None):
-    if date:
-        start = datetime.combine(date, datetime.min.time())
-        end = datetime.combine(date, datetime.max.time())
-        sessions = db.query(SessionModel).filter(
-            SessionModel.timeStamp >= start,
-            SessionModel.timeStamp <= end
-        ).all()
-    else:
-        sessions = db.query(SessionModel).all()
-    
-    return [{"title": s.title, "url": s.url, "label": s.label, "reason": s.reason, "timeSpent": s.timeSpent}
-                for s in sessions]
 
 @app.get("/sessions/summary")
 def aggregated_data(date: date = None):
@@ -99,3 +96,24 @@ def aggregated_data(date: date = None):
     result = query.all()
     return [{"url": r.url, "title": r.title, "label": r.label, "reason": r.reason, "totalTime": r.totalTime}
             for r in result]
+
+@app.post("/set-provider")
+def update_provider(provider: str):
+    set_provider(provider)
+    return {"provider": provider}
+
+@app.get("/get-provider")
+def current_provider():
+    return {"provider": get_provider()}
+
+@app.on_event("startup")
+def warmup_ollama():
+    try:
+        host = os.getenv("OLLAMA_HOST", "http://host.docker.internal:11434")
+        requests.post(f"{host}/api/chat", json={
+            "model": "mistral:7b",
+            "messages": [{"role": "user", "content": "hi"}],
+            "stream": False
+        })
+    except:
+        pass

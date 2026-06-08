@@ -1,0 +1,21 @@
+services:
+  backend:
+    build: ./backend
+    image: activity-tracker
+    ports:
+      - "8000:8000"
+    command: uvicorn main:app --reload --host 0.0.0.0
+    volumes:
+      - ./backend:/app
+    env_file:
+      - .env
+      
+  dashboard:
+    image: activity-tracker
+    ports:
+      - "8501:8501"
+    command: streamlit run dashboard.py --server.address 0.0.0.0
+    volumes:
+      - ./backend:/app
+    env_file:
+      - .env
