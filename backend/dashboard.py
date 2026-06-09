@@ -6,12 +6,23 @@ from datetime import date
 st.set_page_config(page_title="Activity Tracker", layout="wide")
 st.title("Activity Tracker")
 
+current = requests.get("http://backend:8000/get-provider").json()["provider"]
+provider = st.selectbox("AI Provider", ["ollama", "groq", "gemini"], index=["ollama", "groq", "gemini"].index(current)) 
+if provider != current:
+    requests.post(f"http://backend:8000/set-provider?provider={provider}")
+
+@st.cache_data(ttl=30)
+def fetch_sessions(selected_date=None):
+    if selected_date:
+        return requests.get(f"http://backend:8000/sessions/summary?date={selected_date}").json()
+    return requests.get("http://backend:8000/sessions/summary").json()
+
 show_all = st.checkbox("Show all time")
 if not show_all:
     selected_date = st.date_input("Filter by Date", value=date.today())
-    response = requests.get(f"http://localhost:8000/sessions/summary?date={selected_date}")
+    session_list = fetch_sessions(selected_date)
 else:
-    response = requests.get("http://localhost:8000/sessions/summary")
+    session_list = fetch_sessions()
 
 def convert_time(timeSpent):
     if timeSpent < 60:
@@ -23,10 +34,8 @@ def convert_time(timeSpent):
 def clean_sessions(sessions):
     return [{"title": s["title"], "url": s["url"], "reason": s["reason"], "timeSpent": convert_time(s["totalTime"])} for s in sessions]
 
-session_list = response.json()
-
-productive = [s for s in session_list if s["label"] == "productive"]
-unproductive = [s for s in session_list if s["label"] == "unproductive"]
+productive = [s for s in session_list if s["label"] and s["label"].lower() == "productive"]
+unproductive = [s for s in session_list if s["label"] and s["label"].lower() == "unproductive"]
 
 productive_time = sum(s["totalTime"] for s in productive)
 unproductive_time = sum(s["totalTime"] for s in unproductive)

@@ -73,9 +73,11 @@ chrome.alarms.onAlarm.addListener((alarm) => {
                 body: JSON.stringify(sessions)
             })
             .then(res => res.json())
-            .then(data => console.log("Sent:", data))
+            .then(data =>  {
+                console.log("Sent:", data)
+                chrome.storage.local.set({ sessions: []} )
+            })
             .catch(err => console.error("Failed to send:", err))
-            chrome.storage.local.set({ sessions: [] })
         })
     }
 })
