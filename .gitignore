@@ -1,5 +1,5 @@
 backend/venv/
-backend/productivity.db
+*.db
 backend/__pycache__/
 backend/*.pyc
 

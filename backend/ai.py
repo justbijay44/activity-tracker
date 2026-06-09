@@ -24,30 +24,35 @@ def classify_sessions(sessions):
 
 def build_prompt(sessions):
     prompt = f"""
-        You are a JSON API. You must respond with ONLY a JSON array, no other text.
+        You are a JSON API. Respond with ONLY a JSON array, no other text, no markdown.
 
-        Analyze these browser sessions and classify each one:
+        Classify these browser sessions:
         {sessions}
 
-        Return ONLY this JSON format, nothing else:
-        [
-            {{"title": "...", "url": "...", "label": "productive|unproductive|neutral", "reason": "..."}}
-        ]
+        Output format:
+        [{{"title": "...", "url": "...", "label": "productive|unproductive|neutral", "reason": "one sentence"}}]
 
-        Rules:
-        - YouTube is UNPRODUCTIVE unless the title contains words like: tutorial, course, how to, learn, study, lecture, explained, guide
-        - Social media (Facebook, Instagram, Twitter, TikTok) is always UNPRODUCTIVE
-        - Gaming content, sports recaps, vlogs, entertainment is UNPRODUCTIVE
-        - Development tools (GitHub, VS Code, FastAPI, Streamlit, documentation) are PRODUCTIVE
-        - Browser internal pages (chrome://, about:) are NEUTRAL
-        - If timeSpent is less than 30 seconds, label NEUTRAL
-        - Return ONLY JSON, no extra text, no markdown
-    """
+        - label must be exactly one of: "productive", "unproductive", "neutral" (always lowercase)
+        
+        Classification rules (apply in this order):
+        1. timeSpent < 30 seconds → NEUTRAL, reason: "Short visit"
+        2. chrome://, about:, extensions → NEUTRAL, reason: "Browser internal page"
+        3. localhost, 127.0.0.1 → PRODUCTIVE, reason: "Local development"
+        4. GitHub, VS Code, FastAPI, Streamlit, claude.ai, chatgpt.com, stackoverflow.com, docs.* → PRODUCTIVE
+        5. Facebook, Instagram, Twitter, TikTok, reddit.com → UNPRODUCTIVE
+        6. chess.com, gaming sites, sports recap sites → UNPRODUCTIVE
+        7. YouTube with title containing tutorial/course/how to/learn/study/lecture/guide → PRODUCTIVE
+        8. YouTube entertainment, music, vlogs → UNPRODUCTIVE
+        9. News, Wikipedia, general browsing → NEUTRAL
+        10. Work/study related content → PRODUCTIVE
+
+        Return ONLY the JSON array.
+        """
     return prompt
-
 
 def call_ollama(prompt):
     host = os.getenv("OLLAMA_HOST", "http://host.docker.internal:11434")
+    raw = ""
     for attempt in range(3):
         response = requests.post(f"{host}/api/chat", json={
             "model": "mistral:7b",
@@ -57,6 +62,10 @@ def call_ollama(prompt):
         raw = response.json()["message"]["content"].strip()
         if raw:
             break
+
+    if not raw:
+        raise ValueError("Ollama returned empty response after 3 attempts")
+    
     raw = raw.replace("```json", "").replace("```", "").strip()
     return json.loads(raw)
 
@@ -74,7 +83,6 @@ def call_groq(prompt):
             "temperature": 0
         }
     )
-    result = response.json()
     raw = response.json()["choices"][0]["message"]["content"].strip()
     raw = raw.replace("```json", "").replace("```", "").strip()
     return json.loads(raw)

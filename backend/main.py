@@ -1,6 +1,7 @@
 import os
 import requests
 from fastapi import FastAPI
+from fastapi import Depends
 from pydantic import BaseModel
 from sqlalchemy import func
 from sqlalchemy.orm import sessionmaker
@@ -12,7 +13,13 @@ from ai import classify_sessions, set_provider, get_provider
 
 app = FastAPI()
 SessionLocal = sessionmaker(bind=engine)
-db = SessionLocal()
+
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
 
 class Session(BaseModel):
     title: str
@@ -23,26 +30,24 @@ def clean_url(url):
     parsed = urlparse(url)
     return parsed.netloc
 
-@app.get("/hello")
-def hello():
-    return {"message": "hello world"}
-
 @app.post("/sessions")
-def session_req(sessions: list[Session]):
+def session_req(sessions: list[Session], db: SessionLocal = Depends(get_db)):
     to_classify = []
+    seen_urls = set()
 
     for val in sessions:
         cleaned_url = clean_url(val.url)
 
         if not cleaned_url:
             continue
-
+        
         existing = db.query(SessionModel).filter(
             SessionModel.url == cleaned_url,
+            SessionModel.title == val.title,
             SessionModel.label != None,
             SessionModel.label != "neutral"
         ).first()
-
+        
         record = SessionModel(
             title = val.title,
             url = cleaned_url,
@@ -53,21 +58,26 @@ def session_req(sessions: list[Session]):
         )
         db.add(record)
 
-        if not existing:
+        if not existing and cleaned_url not in seen_urls:
             to_classify.append({"title": val.title, "url": cleaned_url, "timeSpent": val.timeSpent})
+            seen_urls.add(cleaned_url)
     
     db.commit()
 
     if to_classify:
         results = []
         for i in range(0, len(to_classify), 3):
-            batch = to_classify[i:i+5]
-            batch_results = classify_sessions(batch)
-            results.extend(batch_results)
-        
+            batch = to_classify[i:i+3]
+            try:
+                batch_results = classify_sessions(batch)
+                results.extend(batch_results)
+            except Exception as e:
+                print(f"Batch failed: {e}")
+                continue
+
         for ai_result in results:
             record = db.query(SessionModel).filter(
-                SessionModel.url == clean_url(ai_result["url"])
+                SessionModel.url == ai_result["url"]
             ).order_by(SessionModel.id.desc()).first()
             if record:
                 record.label = ai_result["label"]
@@ -76,7 +86,7 @@ def session_req(sessions: list[Session]):
     return {"status": "received"}
 
 @app.get("/sessions/summary")
-def aggregated_data(date: date = None):
+def aggregated_data(date: date = None, db: SessionLocal = Depends(get_db)):
     query = db.query(
         SessionModel.url,
         SessionModel.title,
