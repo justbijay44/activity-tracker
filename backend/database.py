@@ -9,9 +9,9 @@ class Session(Base):
 
     id = Column(Integer, primary_key=True)
     title = Column(String)
-    url = Column(String)
+    url = Column(String, index=True)
     timeSpent = Column(Float)
-    timeStamp = Column(DateTime)
+    timeStamp = Column(DateTime, index=True)
     label = Column(String)
     reason = Column(String)
 
@@ -22,7 +22,7 @@ class CustomRule(Base):
     __tablename__ = "customrules"
 
     id = Column(Integer, primary_key=True)
-    domain = Column(String)
+    domain = Column(String, index=True)
     label = Column(String)
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.now)

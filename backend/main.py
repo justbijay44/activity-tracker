@@ -75,9 +75,9 @@ def session_req(sessions: list[Session], db: DBSession = Depends(get_db)):
         )
         db.add(record)
 
-        if not existing and cleaned_url not in seen_urls:
+        if not existing and (cleaned_url, val.title) not in seen_urls:
             to_classify.append({"title": val.title, "url": cleaned_url, "timeSpent": val.timeSpent})
-            seen_urls.add(cleaned_url)
+            seen_urls.add((cleaned_url, val.title))
     
     db.commit()
 
@@ -93,10 +93,12 @@ def session_req(sessions: list[Session], db: DBSession = Depends(get_db)):
                 continue
 
         for ai_result in results:
-            record = db.query(SessionModel).filter(
-                SessionModel.url == ai_result["url"]
-            ).order_by(SessionModel.id.desc()).first()
-            if record:
+            records = db.query(SessionModel).filter(
+                SessionModel.url == ai_result["url"],
+                SessionModel.title == ai_result["title"],
+                SessionModel.label == None,
+            ).all()
+            for record in records:
                 record.label = ai_result["label"]
                 record.reason = ai_result["reason"]
         db.commit()
@@ -106,7 +108,7 @@ def session_req(sessions: list[Session], db: DBSession = Depends(get_db)):
 def aggregated_data(date: date = None, db: DBSession = Depends(get_db)):
     query = db.query(
         SessionModel.url,
-        SessionModel.title,
+        func.max(SessionModel.title).label("title"),
         func.max(SessionModel.label).label("label"),
         func.max(SessionModel.reason).label("reason"),
         func.sum(SessionModel.timeSpent).label("totalTime")
