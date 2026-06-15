@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Activity Tracker</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+    <div class="header">
+        <span class="logo">🎯</span>
+        <span class="title">ActivityTracker</span>
+        <a href="http://localhost:8501" target="_blank" class="dashboard-link" title="Open Dashboard">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
+                <rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/>
+            </svg>
+        </a>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="site-section">
+        <p class="section-label">CURRENT SITE</p>
+        <p class="domain" id="domain">Loading...</p>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="actions-section">
+        <p class="section-label">MARK THIS SITE AS</p>
+        <div class="buttons">
+            <button id="btn-productive" class="btn btn-productive">✅ Productive</button>
+            <button id="btn-unproductive" class="btn btn-unproductive">❌ Unproductive</button>
+            <button id="btn-neutral" class="btn btn-neutral">➖ Neutral</button>
+        </div>
+    </div>
+
+    <div class="status-bar">
+        <p class="status" id="status"></p>
+    </div>
+
+    <script src="popup.js"></script>
+</body>
+</html>

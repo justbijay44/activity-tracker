@@ -27,10 +27,17 @@ def build_prompt(sessions):
         You are a JSON API. Respond with ONLY a JSON array, no other text, no markdown.
 
         Classify these browser sessions:
-        {sessions}
+        {json.dumps(sessions)}
 
         Output format:
         [{{"title": "...", "url": "...", "label": "productive|unproductive|neutral", "reason": "one sentence"}}]
+
+        Examples:
+        Input: [{{"title": "How to Make Sourdough Bread - Full Guide", "url": "youtube.com", "timeSpent": 600}}]
+        Output: [{{"title": "How to Make Sourdough Bread - Full Guide", "url": "youtube.com", "label": "productive", "reason": "Educational tutorial content"}}]
+
+        Input: [{{"title": "Funny Cat Compilation 2024", "url": "youtube.com", "timeSpent": 300}}]
+        Output: [{{"title": "Funny Cat Compilation 2024", "url": "youtube.com", "label": "unproductive", "reason": "Entertainment content"}}]
 
         - label must be exactly one of: "productive", "unproductive", "neutral" (always lowercase)
         
@@ -57,7 +64,10 @@ def call_ollama(prompt):
         response = requests.post(f"{host}/api/chat", json={
             "model": "mistral:7b",
             "messages": [{"role":"user", "content": prompt}],
-            "stream": False
+            "stream": False,
+            "options": {
+                "temperature": 0
+            }
         })
         raw = response.json()["message"]["content"].strip()
         if raw:
