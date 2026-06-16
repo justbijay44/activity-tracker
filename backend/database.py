@@ -30,5 +30,17 @@ class CustomRule(Base):
     def __repr__(self):
         return f"<Domain = {self.domain} label = {self.label} is_active = {self.is_active} created_at = {self.created_at}>"
     
+class SiteLimit(Base):
+    __tablename__ = "sitelimits"
+
+    id = Column(Integer, primary_key=True)
+    domain = Column(String, index=True)
+    daily_limits = Column(Integer)
+    is_blocked = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.now)
+
+    def __repr__(self):
+        return f"<Domain = {self.domain} Daily Limit = {self.daily_limits} Blocked = {self.is_blocked}>"
+
 engine = create_engine("sqlite:///productivity.db")
 Base.metadata.create_all(engine)

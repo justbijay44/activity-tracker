@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Site Blocked</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="blocked.css">
+</head>
+<body>
+    <div class="container">
+        <div class="icon">🚫</div>
+        <h1>Daily Limit Reached</h1>
+        <p class="message">
+            You've hit your daily time limit for this site.
+            It's blocked for the rest of the day to help you stay focused.
+        </p>
+        <button id="btn-back">Go Back</button>
+        <div class="divider"></div>
+
+        <div class="unblock-section">
+            <p class="section-label">WANT TO USE IT ANYWAY?</p>
+            <p class="unblock-steps">
+                Open the Activity Tracker dashboard → <strong>Site Limits</strong> tab → delete this site's limit
+            </p>
+            <a href="http://localhost:8501" target="_blank" class="dashboard-btn">Open Dashboard</a>
+        </div>
+    </div>
+    <script src="blocked.js"></script>
+</body>
+</html>

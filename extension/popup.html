@@ -24,6 +24,7 @@
     <div class="site-section">
         <p class="section-label">CURRENT SITE</p>
         <p class="domain" id="domain">Loading...</p>
+        <p class="usage-info" id="usage-info"></p>
     </div>
 
     <div class="divider"></div>
@@ -34,6 +35,20 @@
             <button id="btn-productive" class="btn btn-productive">✅ Productive</button>
             <button id="btn-unproductive" class="btn btn-unproductive">❌ Unproductive</button>
             <button id="btn-neutral" class="btn btn-neutral">➖ Neutral</button>
+        </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="limit-section">
+        <p class="section-label">SET DAILY LIMIT</p>
+        <div class="limit-row">
+            <input type="number" id="limit-input" min="1" placeholder="mins" />
+            <select id="limit-unit">
+                <option value="mins">mins</option>
+                <option value="hrs">hrs</option>
+            </select>
+            <button id="btn-set-limit" class="btn btn-limit">Set Limit</button>
         </div>
     </div>
 

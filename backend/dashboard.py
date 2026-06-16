@@ -28,7 +28,7 @@ def format_hour(h):
         return f"{h - 12} PM"
     return "12 PM"
     
-tab1, tab2 = st.tabs(["Dashboard", "Rules"])
+tab1, tab2, tab3 = st.tabs(["Dashboard", "Rules", "Site Limits"])
 
 with tab1:
     show_all = st.checkbox("Show all time")
@@ -159,3 +159,15 @@ with tab2:
             requests.patch(f"http://backend:8000/rules/{rule['id']}")
             st.rerun()
             
+with tab3:
+    limits = requests.get("http://backend:8000/limits").json()
+
+    for limit in limits:
+        col1, col2, col3, col4 = st.columns([3, 2, 2, 1])
+        col1.write(limit["domain"])
+        col2.write(f"{limit['daily_limits']} mins")
+        col3.write("Blocked" if limit["is_blocked"] else "Active")
+
+        if col4.button("Delete", key=f"del_limit_{limit['id']}"):
+            requests.delete(f"http://backend:8000/limits/{limit['id']}")
+            st.rerun()

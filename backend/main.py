@@ -8,10 +8,18 @@ from sqlalchemy.orm import sessionmaker, Session as DBSession
 from urllib.parse import urlparse
 
 from datetime import datetime, date
-from database import Session as SessionModel, engine, CustomRule
+from database import Session as SessionModel, engine, CustomRule, SiteLimit
 from ai import classify_sessions, set_provider, get_provider
+from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 SessionLocal = sessionmaker(bind=engine)
 
 def get_db():
@@ -41,7 +49,7 @@ def session_req(sessions: list[Session], db: DBSession = Depends(get_db)):
 
         if not cleaned_url:
             continue
-        
+            
         custom_rule = db.query(CustomRule).filter(
             cleaned_url == CustomRule.domain, CustomRule.is_active == True).first()
         if custom_rule:
@@ -56,7 +64,6 @@ def session_req(sessions: list[Session], db: DBSession = Depends(get_db)):
 
             db.add(record)
             continue
-            
 
         existing = db.query(SessionModel).filter(
             SessionModel.url == cleaned_url,
@@ -223,3 +230,82 @@ def active_hours(date: date = None, db: DBSession = Depends(get_db)):
     
     result = query.all()
     return [{"hour": r.hour, "totalTime": r.totalTime} for r in result]
+
+class LimitBase(BaseModel):
+    domain: str
+    daily_limits: int 
+    
+@app.get("/limits")
+def get_limits(db: DBSession = Depends(get_db)):
+    limits = db.query(SiteLimit).all()
+
+    result = []
+    for limit in limits:
+        start = limit.created_at
+        end = datetime.combine(date.today(), datetime.max.time())
+        usages = db.query(func.sum(SessionModel.timeSpent)).filter(
+            SessionModel.url == limit.domain,
+            SessionModel.timeStamp >= start,
+            SessionModel.timeStamp <= end,
+        ).scalar() or 0
+
+        result.append({
+            "id": limit.id,
+            "domain": limit.domain, 
+            "daily_limits": limit.daily_limits, 
+            "is_blocked": limit.is_blocked, 
+            "created_at": limit.created_at,
+            "usage_today_minutes": round(usages / 60, 1)
+        })
+    return result
+
+@app.post("/limits")
+def upload_limits(limit: LimitBase, db: DBSession = Depends(get_db)):
+    domain = clean_url(limit.domain) or limit.domain
+
+    existing = db.query(SiteLimit).filter(SiteLimit.domain == domain).first()
+    if existing:
+        existing.daily_limits = limit.daily_limits
+        db.commit()
+        return {"status": "updated"}
+    
+    record = SiteLimit(
+        domain = domain,
+        daily_limits = limit.daily_limits
+    )
+    db.add(record)
+    db.commit()
+
+    return {"status": "successfully created"}
+
+@app.delete("/limits/{id}")
+def delete_limit(id: int, db: DBSession = Depends(get_db)):
+    get_id = db.query(SiteLimit).filter(SiteLimit.id == id).first()
+
+    if not get_id:
+        return {"status": "Couldn't find the id"}
+
+    db.delete(get_id)
+    db.commit()
+    return {"status": "successfully deleted"}
+
+@app.post("/limits/check")
+def check_limit(db: DBSession = Depends(get_db)):
+    limits = db.query(SiteLimit).filter(SiteLimit.is_blocked == False).all()
+    newly_blocked = []
+
+    for limit in limits:
+        start = limit.created_at
+        end = datetime.combine(date.today(), datetime.max.time())
+
+        usage = db.query(func.sum(SessionModel.timeSpent)).filter(
+            SessionModel.url == limit.domain,
+            SessionModel.timeStamp >= start,
+            SessionModel.timeStamp <= end,
+        ).scalar() or 0
+
+        if usage >= limit.daily_limits * 60:
+            limit.is_blocked = True
+            newly_blocked.append(limit.domain)
+    db.commit()
+    return {"blocked": newly_blocked}
