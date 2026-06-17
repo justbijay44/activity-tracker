@@ -6,8 +6,9 @@ let blockedDomains = new Set()
 function sendSessions() {
     if (isSending) return
     isSending = true
-    chrome.storage.local.get("sessions", (data) => {
+    chrome.storage.local.get(["sessions", "token"], (data) => {
         let sessions = data.sessions || []
+        const token = data.token
         if (sessions.length == 0) {
             isSending = false
             return
@@ -15,7 +16,10 @@ function sendSessions() {
         console.log(`[SEND] ${sessions.length} sessions`)
         fetch("http://localhost:8000/sessions", {
             method: "POST",
-            headers: {"Content-Type": "application/json"},
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${token}`
+            },
             body: JSON.stringify(sessions)
         })
         .then(res => res.json())
@@ -116,32 +120,52 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 })
 
 function updateBlockedDomains() {
-    fetch("http://localhost:8000/limits/check", { method: "POST" })
-        .then(res => res.json())
-        .then(result => {
-            result.blocked.forEach(d => blockedDomains.add(d))
-            if (result.blocked.length > 0) {
-                chrome.tabs.query({}, (tabs) => {
-                    tabs.forEach(tab => {
-                        try {
-                            const domain = new URL(tab.url).hostname.replace("www.", "")
-                            if (result.blocked.includes(domain)) {
-                                chrome.tabs.reload(tab.id)
-                            }
-                        } catch(e) {}
-                    })
-                })
-            }
-            return fetch("http://localhost:8000/limits")
-        })
-        .then(res => res.json())
-        .then(data => {
-            blockedDomains = new Set(data.filter(l => l.is_blocked).map(l => l.domain))
-            chrome.storage.local.set({ 
-                blockedDomains: [...blockedDomains],
-                limits: data
+    chrome.storage.local.get("token", (data) => {
+        if (!data.token) return
+        const token = data.token
+        fetch("http://localhost:8000/limits/check", { 
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${token}`
+                }
             })
-        })
+            .then(res => res.json())
+            .then(result => {
+                if (!result.blocked) return null
+                result.blocked.forEach(d => blockedDomains.add(d))
+                if (result.blocked.length > 0) {
+                    chrome.tabs.query({}, (tabs) => {
+                        tabs.forEach(tab => {
+                            try {
+                                const domain = new URL(tab.url).hostname.replace("www.", "")
+                                if (result.blocked.includes(domain)) {
+                                    chrome.tabs.reload(tab.id)
+                                }
+                            } catch(e) {}
+                        })
+                    })
+                }
+                return fetch("http://localhost:8000/limits", {
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Authorization": `Bearer ${token}`
+                    }
+                })
+            })
+            .then(res => {
+                if (!res) return
+                return res.json()
+            })
+            .then(data => {
+                if (!data) return
+                blockedDomains = new Set(data.filter(l => l.is_blocked).map(l => l.domain))
+                chrome.storage.local.set({ 
+                    blockedDomains: [...blockedDomains],
+                    limits: data
+                })
+            })
+    })
 }
 
 chrome.webNavigation.onBeforeNavigate.addListener((details) => {

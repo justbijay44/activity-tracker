@@ -8,52 +8,62 @@
     <link rel="stylesheet" href="popup.css">
 </head>
 <body>
-    <div class="header">
-        <span class="logo">🎯</span>
-        <span class="title">ActivityTracker</span>
-        <a href="http://localhost:8501" target="_blank" class="dashboard-link" title="Open Dashboard">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
-                <rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/>
-            </svg>
-        </a>
+
+    <div id="login-section" style="display:none">
+        <input type="email" id="login-email" placeholder="Email" />
+        <input type="password" id="login-password" placeholder="Password" />
+        <button id="btn-login">Login</button>
+        <p id="login-error"></p>
     </div>
 
-    <div class="divider"></div>
-
-    <div class="site-section">
-        <p class="section-label">CURRENT SITE</p>
-        <p class="domain" id="domain">Loading...</p>
-        <p class="usage-info" id="usage-info"></p>
-    </div>
-
-    <div class="divider"></div>
-
-    <div class="actions-section">
-        <p class="section-label">MARK THIS SITE AS</p>
-        <div class="buttons">
-            <button id="btn-productive" class="btn btn-productive">✅ Productive</button>
-            <button id="btn-unproductive" class="btn btn-unproductive">❌ Unproductive</button>
-            <button id="btn-neutral" class="btn btn-neutral">➖ Neutral</button>
+    <div id="main-section">
+        <div class="header">
+            <span class="logo">🎯</span>
+            <span class="title">ActivityTracker</span>
+            <a id="dashboard-link" href="http://localhost:8501" target="_blank" class="dashboard-link" title="Open Dashboard">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
+                    <rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/>
+                </svg>
+            </a>
         </div>
-    </div>
 
-    <div class="divider"></div>
+        <div class="divider"></div>
 
-    <div class="limit-section">
-        <p class="section-label">SET DAILY LIMIT</p>
-        <div class="limit-row">
-            <input type="number" id="limit-input" min="1" placeholder="mins" />
-            <select id="limit-unit">
-                <option value="mins">mins</option>
-                <option value="hrs">hrs</option>
-            </select>
-            <button id="btn-set-limit" class="btn btn-limit">Set Limit</button>
+        <div class="site-section">
+            <p class="section-label">CURRENT SITE</p>
+            <p class="domain" id="domain">Loading...</p>
+            <p class="usage-info" id="usage-info"></p>
         </div>
-    </div>
 
-    <div class="status-bar">
-        <p class="status" id="status"></p>
+        <div class="divider"></div>
+
+        <div class="actions-section">
+            <p class="section-label">MARK THIS SITE AS</p>
+            <div class="buttons">
+                <button id="btn-productive" class="btn btn-productive">✅ Productive</button>
+                <button id="btn-unproductive" class="btn btn-unproductive">❌ Unproductive</button>
+                <button id="btn-neutral" class="btn btn-neutral">➖ Neutral</button>
+            </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="limit-section">
+            <p class="section-label">SET DAILY LIMIT</p>
+            <div class="limit-row">
+                <input type="number" id="limit-input" min="1" placeholder="mins" />
+                <select id="limit-unit">
+                    <option value="mins">mins</option>
+                    <option value="hrs">hrs</option>
+                </select>
+                <button id="btn-set-limit" class="btn btn-limit">Set Limit</button>
+            </div>
+        </div>
+
+        <div class="status-bar">
+            <p class="status" id="status"></p>
+        </div>
     </div>
 
     <script src="popup.js"></script>
