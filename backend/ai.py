@@ -2,24 +2,15 @@ import os
 import json
 import requests
 
-AI_PROVIDER = os.getenv("AI_PROVIDER", "ollama").lower()
-
-def set_provider(provider: str):
-    global AI_PROVIDER
-    AI_PROVIDER = provider.lower()
-
-def get_provider():
-    return AI_PROVIDER
-
-def classify_sessions(sessions):
+def classify_sessions(sessions, provider = None, api_key = None):
     prompt = build_prompt(sessions)
 
-    if AI_PROVIDER == "ollama":
-        return call_ollama(prompt)
-    if AI_PROVIDER == "groq":
-        return call_groq(prompt)
-    if AI_PROVIDER == "gemini":
-        return call_gemini(prompt)
+    provider = (provider or "ollama").lower()
+
+    if provider == "groq":
+        return call_groq(prompt, api_key)
+    if provider == "gemini":
+        return call_gemini(prompt, api_key)
     return call_ollama(prompt)
 
 def build_prompt(sessions):
@@ -79,8 +70,8 @@ def call_ollama(prompt):
     raw = raw.replace("```json", "").replace("```", "").strip()
     return json.loads(raw)
 
-def call_groq(prompt):
-    api_key = os.getenv("GROQ_API_KEY")
+def call_groq(prompt, api_key=None):
+    api_key = api_key
     response = requests.post(
         "https://api.groq.com/openai/v1/chat/completions",
         headers={
@@ -97,8 +88,8 @@ def call_groq(prompt):
     raw = raw.replace("```json", "").replace("```", "").strip()
     return json.loads(raw)
 
-def call_gemini(prompt):
-    api_key = os.getenv("GEMINI_API_KEY")
+def call_gemini(prompt, api_key=None):
+    api_key = api_key
     response = requests.post(
         f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={api_key}",
         json={"contents": [{"parts": [{"text": prompt}]}]}

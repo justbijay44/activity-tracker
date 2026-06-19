@@ -7,17 +7,41 @@ from datetime import date
 st.set_page_config(page_title="Activity Tracker", layout="wide")
 st.title("Activity Tracker")
 
-@st.cache_data(ttl=30)
-def fetch_sessions(selected_date=None):
-    if selected_date:
-        return requests.get(f"http://backend:8000/sessions/summary?date={selected_date}").json()
-    return requests.get("http://backend:8000/sessions/summary").json()
+if "token" not in st.session_state:
+    params = st.query_params
+    if "token" in params:
+        st.session_state.token = params["token"]
+        st.rerun()  
+        
+    st.subheader("Login")
+    email = st.text_input("Email")
+    password = st.text_input("Password", type="password")
+    if st.button("Login"):
+        res = requests.post("http://backend:8000/login", json={"email": email, "password": password})
+        data = res.json()
+        if "access_token" in data:
+            st.session_state.token = data["access_token"]
+            st.rerun()
+        else:
+            st.error("Invalid Credentials")
+    st.stop()
+
+token = st.session_state.token
+headers = {"Authorization": f"Bearer {token}"}
 
 @st.cache_data(ttl=30)
-def fetch_active_hours(selected_date=None):
+def fetch_sessions(token, selected_date=None):
+    headers = {"Authorization": f"Bearer {token}"}
     if selected_date:
-        return requests.get(f"http://backend:8000/sessions/hourly?date={selected_date}").json()
-    return requests.get("http://backend:8000/sessions/hourly").json()
+        return requests.get(f"http://backend:8000/sessions/summary?date={selected_date}", headers=headers).json()
+    return requests.get("http://backend:8000/sessions/summary", headers=headers).json()
+
+@st.cache_data(ttl=30)
+def fetch_active_hours(token, selected_date=None):
+    headers = {"Authorization": f"Bearer {token}"}
+    if selected_date:
+        return requests.get(f"http://backend:8000/sessions/hourly?date={selected_date}", headers=headers).json()
+    return requests.get("http://backend:8000/sessions/hourly", headers=headers).json()
 
 def format_hour(h):
     if h == 0:
@@ -28,17 +52,17 @@ def format_hour(h):
         return f"{h - 12} PM"
     return "12 PM"
     
-tab1, tab2, tab3 = st.tabs(["Dashboard", "Rules", "Site Limits"])
+tab1, tab2, tab3, tab4 = st.tabs(["Dashboard", "Rules", "Site Limits", "Settings"])
 
 with tab1:
     show_all = st.checkbox("Show all time")
     if not show_all:
         selected_date = st.date_input("Filter by Date", value=date.today())
-        session_list = fetch_sessions(selected_date)
-        hourly_list = fetch_active_hours(selected_date)
+        session_list = fetch_sessions(token, selected_date)
+        hourly_list = fetch_active_hours(token, selected_date)
     else:
-        session_list = fetch_sessions()
-        hourly_list = fetch_active_hours()
+        session_list = fetch_sessions(token)
+        hourly_list = fetch_active_hours(token)
     hourly_dict = {int(r["hour"]): r["totalTime"] for r in hourly_list}
 
     def convert_time(timeSpent):
@@ -133,7 +157,7 @@ with tab2:
         if not domain:
             st.warning("Please enter a domain")
         else:
-            response = requests.post("http://backend:8000/rules", json={"domain": domain, "label": label})
+            response = requests.post("http://backend:8000/rules", headers=headers, json={"domain": domain, "label": label})
             result = response.json()
             if result["status"] == "created":
                 st.success("Rule added!")
@@ -144,7 +168,7 @@ with tab2:
 
     st.divider()
 
-    rules = requests.get("http://backend:8000/rules").json()
+    rules = requests.get("http://backend:8000/rules", headers=headers).json()
 
     for rule in rules:
         col1, col2, col3, col4 = st.columns([3, 2, 1, 1])
@@ -153,14 +177,14 @@ with tab2:
         col3.write("Active" if rule["is_active"] else "Paused")
 
         if col4.button("Delete", key=f"del_{rule['id']}"):
-            requests.delete(f"http://backend:8000/rules/{rule['id']}")
+            requests.delete(f"http://backend:8000/rules/{rule['id']}", headers=headers)
             st.rerun()
         if col4.button("Toggle", key=f"tog_{rule['id']}"):
-            requests.patch(f"http://backend:8000/rules/{rule['id']}")
+            requests.patch(f"http://backend:8000/rules/{rule['id']}", headers=headers)
             st.rerun()
             
 with tab3:
-    limits = requests.get("http://backend:8000/limits").json()
+    limits = requests.get("http://backend:8000/limits", headers=headers).json()
 
     for limit in limits:
         col1, col2, col3, col4 = st.columns([3, 2, 2, 1])
@@ -169,5 +193,27 @@ with tab3:
         col3.write("Blocked" if limit["is_blocked"] else "Active")
 
         if col4.button("Delete", key=f"del_limit_{limit['id']}"):
-            requests.delete(f"http://backend:8000/limits/{limit['id']}")
+            requests.delete(f"http://backend:8000/limits/{limit['id']}", headers=headers)
             st.rerun()
+
+with tab4:
+    st.subheader("AI Settings")
+
+    current = requests.get("http://backend:8000/settings", headers=headers).json()
+    st.write(f"Current provider: {current['ai_provider']}")
+    st.write(f"API key set: {current['has_key']}")
+
+    st.divider()
+
+    provider = st.selectbox("Provider", ["ollama", "groq", "gemini"])
+    api_key = st.text_input("API key", type="password", placeholder="Leave Blank if using Ollama")
+
+    if st.button("Save"):
+        res = requests.post("http://backend:8000/settings", headers=headers, 
+                    json={ "ai_provider": provider, "api_key": api_key })
+    
+        if res.status_code == 200:
+            st.success("Settings saved!")
+
+        else:
+            st.error(res.json().get("detail", "Something went wrong"))

@@ -8,6 +8,7 @@ class Session(Base):
     __tablename__ = "sessions"
 
     id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, nullable=True)
     title = Column(String)
     url = Column(String, index=True)
     timeSpent = Column(Float)
@@ -22,6 +23,7 @@ class CustomRule(Base):
     __tablename__ = "customrules"
 
     id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, nullable=True)
     domain = Column(String, index=True)
     label = Column(String)
     is_active = Column(Boolean, default=True)
@@ -34,6 +36,7 @@ class SiteLimit(Base):
     __tablename__ = "sitelimits"
 
     id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, nullable=True)
     domain = Column(String, index=True)
     daily_limits = Column(Integer)
     is_blocked = Column(Boolean, default=False)
@@ -41,6 +44,17 @@ class SiteLimit(Base):
 
     def __repr__(self):
         return f"<Domain = {self.domain} Daily Limit = {self.daily_limits} Blocked = {self.is_blocked}>"
+
+class User(Base):
+    __tablename__ = "users"
+
+    id = Column(Integer, primary_key=True)
+    name = Column(String, nullable=True)
+    email = Column(String, unique=True, index=True)
+    password_hash = Column(String)
+    ai_provider = Column(String, default="ollama")
+    encrypted_api_key = Column(String, nullable=True)
+    created_at = Column(DateTime, default=datetime.now)
 
 engine = create_engine("sqlite:///productivity.db")
 Base.metadata.create_all(engine)
