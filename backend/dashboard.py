@@ -11,8 +11,7 @@ if "token" not in st.session_state:
     params = st.query_params
     if "token" in params:
         st.session_state.token = params["token"]
-        st.query_params.clear()
-        st.rerun()
+        st.rerun()  
         
     st.subheader("Login")
     email = st.text_input("Email")
@@ -53,7 +52,7 @@ def format_hour(h):
         return f"{h - 12} PM"
     return "12 PM"
     
-tab1, tab2, tab3 = st.tabs(["Dashboard", "Rules", "Site Limits"])
+tab1, tab2, tab3, tab4 = st.tabs(["Dashboard", "Rules", "Site Limits", "Settings"])
 
 with tab1:
     show_all = st.checkbox("Show all time")
@@ -196,3 +195,25 @@ with tab3:
         if col4.button("Delete", key=f"del_limit_{limit['id']}"):
             requests.delete(f"http://backend:8000/limits/{limit['id']}", headers=headers)
             st.rerun()
+
+with tab4:
+    st.subheader("AI Settings")
+
+    current = requests.get("http://backend:8000/settings", headers=headers).json()
+    st.write(f"Current provider: {current['ai_provider']}")
+    st.write(f"API key set: {current['has_key']}")
+
+    st.divider()
+
+    provider = st.selectbox("Provider", ["ollama", "groq", "gemini"])
+    api_key = st.text_input("API key", type="password", placeholder="Leave Blank if using Ollama")
+
+    if st.button("Save"):
+        res = requests.post("http://backend:8000/settings", headers=headers, 
+                    json={ "ai_provider": provider, "api_key": api_key })
+    
+        if res.status_code == 200:
+            st.success("Settings saved!")
+
+        else:
+            st.error(res.json().get("detail", "Something went wrong"))

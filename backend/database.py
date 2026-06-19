@@ -52,6 +52,8 @@ class User(Base):
     name = Column(String, nullable=True)
     email = Column(String, unique=True, index=True)
     password_hash = Column(String)
+    ai_provider = Column(String, default="ollama")
+    encrypted_api_key = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.now)
 
 engine = create_engine("sqlite:///productivity.db")

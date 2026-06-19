@@ -8,10 +8,11 @@ from dotenv import load_dotenv
 from sqlalchemy.orm import sessionmaker, Session as DBSession
 from urllib.parse import urlparse
 from passlib.context import CryptContext
-
+from cryptography.fernet import Fernet
 from datetime import datetime, date, timedelta, timezone
+
+from ai import classify_sessions
 from database import Session as SessionModel, engine, CustomRule, SiteLimit, User as UserModel
-from ai import classify_sessions, set_provider, get_provider
 from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
@@ -27,6 +28,7 @@ SessionLocal = sessionmaker(bind=engine)
 pwd_context = CryptContext(schemes=["bcrypt"])
 SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret-change-in-prod")
 ALGORITHM = "HS256"
+fernet = Fernet(os.getenv("FERNET_KEY"))
 
 def get_db():
     db = SessionLocal()
@@ -41,6 +43,12 @@ def create_token(user_id: int):
         "exp": datetime.now(timezone.utc) + timedelta(days=30)
     }
     return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
+
+def encrypt(text: str) -> str:
+    return fernet.encrypt(text.encode()).decode()
+
+def decrypt(text: str) -> str:
+    return fernet.decrypt(text.encode()).decode()
 
 def get_current_user(authorization: str = Header(...), db: DBSession = Depends(get_db)):
     try:
@@ -124,10 +132,12 @@ def session_req(sessions: list[Session], db: DBSession = Depends(get_db), curren
 
     if to_classify:
         results = []
+        provider = current_user.ai_provider
+        api_key = decrypt(current_user.encrypted_api_key) if current_user.encrypted_api_key else None
         for i in range(0, len(to_classify), 3):
             batch = to_classify[i:i+3]
             try:
-                batch_results = classify_sessions(batch)
+                batch_results = classify_sessions(batch, provider=provider, api_key=api_key)
                 results.extend(batch_results)
             except Exception as e:
                 print(f"Batch failed: {e}")
@@ -169,27 +179,6 @@ def aggregated_data(date: date = None, db: DBSession = Depends(get_db), current_
     result = query.all()
     return [{"url": r.url, "title": r.title, "label": r.label, "reason": r.reason, "totalTime": r.totalTime}
             for r in result]
-
-@app.post("/set-provider")
-def update_provider(provider: str):
-    set_provider(provider)
-    return {"provider": provider}
-
-@app.get("/get-provider")
-def current_provider():
-    return {"provider": get_provider()}
-
-@app.on_event("startup")
-def warmup_ollama():
-    try:
-        host = os.getenv("OLLAMA_HOST", "http://host.docker.internal:11434")
-        requests.post(f"{host}/api/chat", json={
-            "model": "mistral:7b",
-            "messages": [{"role": "user", "content": "hi"}],
-            "stream": False
-        })
-    except:
-        pass
 
 class RulesBase(BaseModel):
     domain: str
@@ -408,3 +397,25 @@ def login(user: User, db: DBSession = Depends(get_db)):
     
     token = create_token(existing.id)
     return {"access_token": token}
+
+class SettingsBase(BaseModel):
+    ai_provider: str
+    api_key: str = ""
+
+@app.get("/settings")
+def get_settings(current_user = Depends(get_current_user)):
+    return {
+        "ai_provider": current_user.ai_provider, 
+        "has_key": current_user.encrypted_api_key is not None
+    }
+
+@app.post("/settings")
+def post_settings(settings: SettingsBase, db: DBSession = Depends(get_db), current_user = Depends(get_current_user)):
+    if settings.ai_provider != "ollama" and not settings.api_key and not current_user.encrypted_api_key:
+        raise HTTPException(status_code=400, detail="API key is required for this provider")
+    current_user.ai_provider = settings.ai_provider
+    if settings.api_key:
+        current_user.encrypted_api_key = encrypt(settings.api_key)
+    db.commit()
+    return {"status": "saved"}
+

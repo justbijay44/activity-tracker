@@ -164,6 +164,7 @@ function updateBlockedDomains() {
                     blockedDomains: [...blockedDomains],
                     limits: data
                 })
+                .catch(err => console.log("[BLOCKED] Backend not reachable:", err.message))
             })
     })
 }
